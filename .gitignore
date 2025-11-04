@@ -1,0 +1,87 @@
+# ============================================
+# GITIGNORE PRINCIPAL - Teste do Teste
+# ============================================
+
+# Dependências
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Variáveis de ambiente - DADOS SENSÍVEIS
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+**/.env
+**/.env.local
+
+# Credenciais do Firebase - MUITO SENSÍVEL!
+serviceAccountKey.json
+firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+**/*serviceAccountKey*.json
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+
+# Build e Dist
+dist/
+build/
+*.js.map
+coverage/
+
+# Logs
+logs/
+*.log
+
+# Sistema Operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.sublime-project
+*.sublime-workspace
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.vite/
+
+# Temporários
+tmp/
+temp/
+*.tmp
+
+# Outros
+*.pid
+*.seed
+*.pid.lock
+.npm
+
+# Arquivos aleatórios
+design-notes.md
+GIT_SETUP.md 
+GOOGLE_LOGIN_SETUP.md 
+IMPLEMENTATION_SUMMARY.md 
+INTEGRATION_GUIDE.md 
+prompt.md 
+QUICK_START.md 
+ROADMAP.md 
+SECURITY.md
