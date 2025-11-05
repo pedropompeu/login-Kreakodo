@@ -1,4 +1,6 @@
-import React from 'react';
+
+
+type FirestoreTimestamp = { seconds: number; toDate: () => Date };
 
 interface User {
   uid: string;
@@ -7,8 +9,8 @@ interface User {
   username: string;
   role: 'user' | 'admin' | 'superadmin';
   active: boolean;
-  createdAt: any;
-  lastLoginAt: any;
+  createdAt: FirestoreTimestamp | Date | string | null;
+  lastLoginAt: FirestoreTimestamp | Date | string | null;
 }
 
 interface UserListItemProps {
@@ -54,7 +56,11 @@ const UserListItem: React.FC<UserListItemProps> = ({
         </span>
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
-        {user.createdAt?.toDate?.()?.toLocaleDateString('pt-BR') || 'N/A'}
+        {user.createdAt && typeof user.createdAt === 'object' && 'toDate' in user.createdAt 
+          ? user.createdAt.toDate().toLocaleDateString('pt-BR')
+          : user.createdAt instanceof Date 
+          ? user.createdAt.toLocaleDateString('pt-BR')
+          : 'N/A'}
       </td>
       <td className="px-4 py-3">
         <div className="flex gap-2 flex-wrap">

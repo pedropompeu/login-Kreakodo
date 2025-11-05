@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../hooks/useToast';
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import UserListItem from '../components/UserListItem';
 import AddUserModal from '../components/AddUserModal';
 import EditUserModal from '../components/EditUserModal';
+
+type FirestoreTimestamp = { seconds: number; toDate: () => Date };
 
 interface User {
   uid: string;
@@ -14,8 +16,8 @@ interface User {
   username: string;
   role: 'user' | 'admin' | 'superadmin';
   active: boolean;
-  createdAt: any;
-  lastLoginAt: any;
+  createdAt: FirestoreTimestamp | Date | string | null;
+  lastLoginAt: FirestoreTimestamp | Date | string | null;
 }
 
 const AdminPage = () => {
@@ -34,7 +36,7 @@ const AdminPage = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = await currentUser?.getIdToken();
       const response = await fetch('http://localhost:4000/api/users', {
@@ -55,11 +57,11 @@ const AdminPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   useEffect(() => {
     let result = [...users];
@@ -85,9 +87,13 @@ const AdminPage = () => {
       if (sortBy === 'name') {
         comparison = a.fullName.localeCompare(b.fullName);
       } else if (sortBy === 'createdAt') {
-        comparison = (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0);
+        const aSeconds = (a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt) ? a.createdAt.seconds : 0;
+        const bSeconds = (b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt) ? b.createdAt.seconds : 0;
+        comparison = aSeconds - bSeconds;
       } else if (sortBy === 'lastLoginAt') {
-        comparison = (a.lastLoginAt?.seconds || 0) - (b.lastLoginAt?.seconds || 0);
+        const aLastSeconds = (a.lastLoginAt && typeof a.lastLoginAt === 'object' && 'seconds' in a.lastLoginAt) ? a.lastLoginAt.seconds : 0;
+        const bLastSeconds = (b.lastLoginAt && typeof b.lastLoginAt === 'object' && 'seconds' in b.lastLoginAt) ? b.lastLoginAt.seconds : 0;
+        comparison = aLastSeconds - bLastSeconds;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -216,8 +222,8 @@ const AdminPage = () => {
             value={`${sortBy}-${sortOrder}`}
             onChange={(e) => {
               const [sort, order] = e.target.value.split('-');
-              setSortBy(sort as any);
-              setSortOrder(order as any);
+              setSortBy(sort as 'name' | 'createdAt' | 'lastLoginAt');
+              setSortOrder(order as 'asc' | 'desc');
             }}
           >
             <option value="name-asc">Nome (A-Z)</option>
@@ -230,7 +236,7 @@ const AdminPage = () => {
           <select
             className="px-4 py-2 border rounded-lg"
             value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value as any)}
+            onChange={(e) => setFilterActive(e.target.value as 'all' | 'active' | 'inactive')}
           >
             <option value="all">Todos</option>
             <option value="active">Ativos</option>
@@ -291,7 +297,7 @@ const AdminPage = () => {
           setSelectedUser(null);
         }}
         onUserUpdated={fetchUsers}
-        authToken={currentUser?.getIdToken() as any}
+        authToken={currentUser?.getIdToken || ''}
       />
     </div>
   );

@@ -5,11 +5,12 @@ interface AuthRequest extends Request {
   user?: admin.auth.DecodedIdToken;
 }
 
-const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'No token provided.' });
+    res.status(401).json({ message: 'No token provided.' });
+    return;
   }
 
   const idToken = header.split('Bearer ')[1];
@@ -20,7 +21,7 @@ const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunctio
     next();
   } catch (error) {
     console.error('Error verifying Firebase ID token:', error);
-    return res.status(403).json({ message: 'Invalid or expired token.' });
+    res.status(403).json({ message: 'Invalid or expired token.' });
   }
 };
 

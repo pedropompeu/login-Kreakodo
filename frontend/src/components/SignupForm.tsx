@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { useToast } from '../contexts/ToastContext';
+import { useToast } from '../hooks/useToast';
 
 const SignupForm = () => {
   const [email, setEmail] = useState('');
@@ -60,9 +60,10 @@ const SignupForm = () => {
       
       toast.success('Cadastro realizado com sucesso!');
       navigate('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error during signup:', err);
-      setError(err.message || 'Erro ao criar usuário. Tente novamente.');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar usuário. Tente novamente.';
+      setError(errorMessage);
       toast.error('Erro ao criar usuário');
     } finally {
       setLoading(false);
@@ -106,12 +107,14 @@ const SignupForm = () => {
 
       toast.success('Cadastro com Google realizado com sucesso!');
       navigate('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error during Google signup:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      const firebaseError = err as { code?: string; message?: string };
+      if (firebaseError.code === 'auth/popup-closed-by-user') {
         toast.warning('Cadastro cancelado');
       } else {
-        setError(err.message);
+        const errorMessage = firebaseError.message || 'Erro desconhecido';
+        setError(errorMessage);
         toast.error('Erro ao cadastrar com Google');
       }
     } finally {

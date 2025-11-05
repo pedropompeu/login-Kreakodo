@@ -1,4 +1,4 @@
-import React from 'react';
+
 import SignupForm from '../components/SignupForm';
 import LoginForm from '../components/LoginForm';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
@@ -12,8 +12,9 @@ const AuthPage = () => {
       try {
         await sendPasswordResetEmail(auth, email);
         alert('Password reset email sent! Check your inbox.');
-      } catch (error: any) {
-        alert(`Error sending password reset email: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        alert(`Error sending password reset email: ${errorMessage}`);
       }
     }
   };

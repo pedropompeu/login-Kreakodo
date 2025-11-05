@@ -1,49 +1,58 @@
 import request from 'supertest';
 
 // Mock Firebase Admin SDK to avoid actual Firebase calls during tests
-jest.mock('firebase-admin', () => ({
+const mockAdmin = {
   initializeApp: jest.fn(),
   credential: {
     cert: jest.fn(),
   },
-  firestore: () => ({
-    collection: jest.fn(() => ({
-      doc: jest.fn(() => ({
-        set: jest.fn(),
-        get: jest.fn(() => ({
-          exists: true,
-          data: jest.fn(() => ({
-            uid: 'test-uid',
-            email: 'test@example.com',
-            fullName: 'Test User',
-            username: '@testuser',
-            role: 'user',
-            active: true,
-          })),
-        })),
-        update: jest.fn(),
-      })),
-      where: jest.fn(() => ({
-        limit: jest.fn(() => ({
+  firestore: Object.assign(
+    jest.fn(() => ({
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => ({
+          set: jest.fn(() => Promise.resolve()),
           get: jest.fn(() => ({
-            empty: false,
-            docs: [{
-              data: () => ({
-                email: 'test@example.com',
-                username: '@testuser',
-              }),
-            }],
+            exists: true,
+            data: jest.fn(() => ({
+              uid: 'test-uid',
+              email: 'test@example.com',
+              fullName: 'Test User',
+              username: '@testuser',
+              role: 'user',
+              active: true,
+            })),
+          })),
+          update: jest.fn(() => Promise.resolve()),
+        })),
+        where: jest.fn(() => ({
+          limit: jest.fn(() => ({
+            get: jest.fn(() => ({
+              empty: false,
+              docs: [{
+                data: () => ({
+                  email: 'test@example.com',
+                  username: '@testuser',
+                }),
+              }],
+            })),
           })),
         })),
       })),
     })),
-  }),
+    {
+      FieldValue: {
+        serverTimestamp: jest.fn(() => 'mocked-timestamp'),
+      },
+    }
+  ),
   auth: () => ({
     verifyIdToken: jest.fn(() => Promise.resolve({ uid: 'test-uid', email: 'test@example.com' })),
     getUserByEmail: jest.fn(() => Promise.reject({ code: 'auth/user-not-found' })),
     createUser: jest.fn(() => Promise.resolve({ uid: 'test-uid' })),
   }),
-}));
+};
+
+jest.mock('firebase-admin', () => mockAdmin);
 
 // Import the app after mocking firebase-admin
 const app = require('../index').default;
@@ -86,10 +95,16 @@ describe('Backend API Tests', () => {
           uid: 'test-uid-123',
           email: 'newuser@example.com',
           fullName: 'New User',
-          username: '@newuser',
+          username: 'newuser',
         });
+      
+      if (res.statusCode !== 201) {
+        console.log('Response body:', res.body);
+        console.log('Response status:', res.statusCode);
+      }
+      
       expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty('message');
+      expect(res.body).toHaveProperty('message', 'User document created successfully.');
     });
 
     it('should return 400 if required fields are missing', async () => {
@@ -99,6 +114,20 @@ describe('Backend API Tests', () => {
           email: 'newuser@example.com',
         });
       expect(res.statusCode).toEqual(400);
+      expect(res.body).toHaveProperty('errors');
+    });
+
+    it('should return 400 if email is invalid', async () => {
+      const res = await request(app)
+        .post('/api/auth/signup')
+        .send({
+          uid: 'test-uid-123',
+          email: 'invalid-email',
+          fullName: 'New User',
+          username: 'newuser',
+        });
+      expect(res.statusCode).toEqual(400);
+      expect(res.body).toHaveProperty('errors');
     });
   });
 });

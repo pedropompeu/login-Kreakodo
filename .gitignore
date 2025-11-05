@@ -74,14 +74,3 @@ temp/
 *.seed
 *.pid.lock
 .npm
-
-# Arquivos aleatórios
-design-notes.md
-GIT_SETUP.md 
-GOOGLE_LOGIN_SETUP.md 
-IMPLEMENTATION_SUMMARY.md 
-INTEGRATION_GUIDE.md 
-prompt.md 
-QUICK_START.md 
-ROADMAP.md 
-SECURITY.md

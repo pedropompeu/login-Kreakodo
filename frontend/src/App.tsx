@@ -1,10 +1,11 @@
-import React from 'react';
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AuthPage from './pages/AuthPage';
 import AdminPage from './pages/AdminPage';
 import UserPage from './pages/UserPage';
 import RoleSelectionPage from './pages/RoleSelectionPage';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import { ToastProvider } from './contexts/ToastContext';
 
 interface ProtectedRouteProps {

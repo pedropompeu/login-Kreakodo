@@ -1,5 +1,5 @@
-import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
+
+import { useAuth } from '../hooks/useAuth';
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 

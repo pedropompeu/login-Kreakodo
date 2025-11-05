@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { useToast } from '../contexts/ToastContext';
+import { useToast } from '../hooks/useToast';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -40,8 +40,9 @@ const LoginForm = () => {
       
       toast.success('Login realizado com sucesso!');
       navigate('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(errorMessage);
       toast.error('Erro ao fazer login. Verifique suas credenciais.');
       console.error('Error during login:', err);
     } finally {
@@ -90,12 +91,14 @@ const LoginForm = () => {
 
       toast.success('Login com Google realizado com sucesso!');
       navigate('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error during Google login:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      const firebaseError = err as { code?: string; message?: string };
+      if (firebaseError.code === 'auth/popup-closed-by-user') {
         toast.warning('Login cancelado');
       } else {
-        setError(err.message);
+        const errorMessage = firebaseError.message || 'Erro desconhecido';
+        setError(errorMessage);
         toast.error('Erro ao fazer login com Google');
       }
     } finally {

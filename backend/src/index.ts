@@ -11,12 +11,35 @@ import fs from 'fs';
 dotenv.config();
 
 // Initialize Firebase Admin SDK
-const serviceAccount = require(path.resolve(__dirname, '..', process.env.GOOGLE_APPLICATION_CREDENTIALS as string));
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID,
-});
+if (process.env.NODE_ENV !== 'test') {
+  let serviceAccount: any;
+  try {
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!credentialsPath) {
+      throw new Error('GOOGLE_APPLICATION_CREDENTIALS environment variable is not set');
+    }
+    
+    const fullPath = path.resolve(__dirname, '..', credentialsPath);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`Service account file not found at: ${fullPath}`);
+    }
+    
+    serviceAccount = require(fullPath);
+    
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID,
+    });
+  } catch (error) {
+    console.error('Error loading service account:', error);
+    process.exit(1);
+  }
+} else {
+  // Test environment - Firebase Admin is mocked
+  admin.initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || 'test-project',
+  });
+}
 
 const db = admin.firestore();
 
@@ -65,10 +88,11 @@ app.post(
     body('fullName').notEmpty().withMessage('Full name is required'),
     body('username').notEmpty().withMessage('Username is required'),
   ],
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      res.status(400).json({ errors: errors.array() });
+      return;
     }
 
     try {
@@ -91,61 +115,83 @@ app.post(
       res.status(201).json({ message: 'User document created successfully.' });
     } catch (error: any) {
       console.error('Error creating user document:', error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: 'Internal server error while creating user.' });
     }
   }
 );
 
 // Middleware to check if user is admin or superadmin
-const isAdmin = async (req: any, res: Response, next: NextFunction) => {
+const isAdmin = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Unauthorized.' });
+    res.status(401).json({ message: 'Unauthorized.' });
+    return;
   }
-  const userDoc = await db.collection('users').doc(req.user.uid).get();
-  const user = userDoc.data() as User;
+  
+  try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const user = userDoc.data() as User;
 
-  if (user && (user.role === 'admin' || user.role === 'superadmin')) {
-    next();
-  } else {
-    res.status(403).json({ message: 'Forbidden: Admin access required.' });
+    if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+      next();
+    } else {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+    }
+  } catch (error) {
+    console.error('Error checking admin role:', error);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 };
 
 // Middleware to check if user is superadmin
-const isSuperAdmin = async (req: any, res: Response, next: NextFunction) => {
+const isSuperAdmin = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Unauthorized.' });
+    res.status(401).json({ message: 'Unauthorized.' });
+    return;
   }
-  const userDoc = await db.collection('users').doc(req.user.uid).get();
-  const user = userDoc.data() as User;
+  
+  try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const user = userDoc.data() as User;
 
-  if (user && user.role === 'superadmin') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Forbidden: SuperAdmin access required.' });
+    if (user && user.role === 'superadmin') {
+      next();
+    } else {
+      res.status(403).json({ message: 'Forbidden: SuperAdmin access required.' });
+    }
+  } catch (error) {
+    console.error('Error checking superadmin role:', error);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 };
 
 // GET /api/users/check-username - Check if username is available
-app.get('/api/users/check-username', async (req: Request, res: Response) => {
+app.get('/api/users/check-username', async (req: Request, res: Response): Promise<void> => {
   try {
     const { username } = req.query;
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required.' });
+    if (!username || typeof username !== 'string') {
+      res.status(400).json({ message: 'Username is required and must be a string.' });
+      return;
     }
 
-    const formattedUsername = `@${String(username).replace(/^@/, '')}`;
+    // Validate username format
+    const cleanUsername = username.trim();
+    if (cleanUsername.length < 3 || cleanUsername.length > 20) {
+      res.status(400).json({ message: 'Username must be between 3 and 20 characters.' });
+      return;
+    }
+
+    const formattedUsername = `@${cleanUsername.replace(/^@/, '')}`;
     const snapshot = await db.collection('users').where('username', '==', formattedUsername).limit(1).get();
     
     res.status(200).json({ available: snapshot.empty });
   } catch (error: any) {
     console.error('Error checking username:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error while checking username availability.' });
   }
 });
 
 // GET /api/users/by-username/:username - Get user by username (for login)
-app.get('/api/users/by-username/:username', async (req: Request, res: Response) => {
+app.get('/api/users/by-username/:username', async (req: Request, res: Response): Promise<void> => {
   try {
     const { username } = req.params;
     const formattedUsername = `@${username.replace(/^@/, '')}`;
@@ -153,14 +199,15 @@ app.get('/api/users/by-username/:username', async (req: Request, res: Response) 
     const snapshot = await db.collection('users').where('username', '==', formattedUsername).limit(1).get();
     
     if (snapshot.empty) {
-      return res.status(404).json({ message: 'User not found.' });
+      res.status(404).json({ message: 'User not found.' });
+      return;
     }
     
     const userData = snapshot.docs[0].data();
     res.status(200).json({ email: userData.email });
   } catch (error: any) {
     console.error('Error getting user by username:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
@@ -193,7 +240,7 @@ app.get('/api/users', authMiddleware, isAdmin, async (req: any, res) => {
 });
 
 // GET /api/users/:uid - Get user details (Admin/Self)
-app.get('/api/users/:uid', authMiddleware, async (req: any, res) => {
+app.get('/api/users/:uid', authMiddleware, async (req: any, res: Response): Promise<void> => {
   try {
     const { uid } = req.params;
 
@@ -201,18 +248,20 @@ app.get('/api/users/:uid', authMiddleware, async (req: any, res) => {
       const userDoc = await db.collection('users').doc(req.user.uid).get();
       const user = userDoc.data() as User;
       if (user.role !== 'admin' && user.role !== 'superadmin') {
-        return res.status(403).json({ message: 'Forbidden: You can only view your own profile.' });
+        res.status(403).json({ message: 'Forbidden: You can only view your own profile.' });
+        return;
       }
     }
 
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
-      return res.status(404).json({ message: 'User not found.' });
+      res.status(404).json({ message: 'User not found.' });
+      return;
     }
     res.status(200).json(userDoc.data());
   } catch (error: any) {
     console.error('Error getting user details:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
@@ -224,10 +273,11 @@ app.put(
     body('fullName').notEmpty().withMessage('Full name is required'),
     body('username').notEmpty().withMessage('Username is required'),
   ],
-  async (req: any, res: Response) => {
+  async (req: any, res: Response): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      res.status(400).json({ errors: errors.array() });
+      return;
     }
 
     try {
@@ -238,7 +288,8 @@ app.put(
         const userDoc = await db.collection('users').doc(req.user.uid).get();
         const user = userDoc.data() as User;
         if (user.role !== 'admin' && user.role !== 'superadmin') {
-          return res.status(403).json({ message: 'Forbidden: You can only edit your own profile.' });
+          res.status(403).json({ message: 'Forbidden: You can only edit your own profile.' });
+          return;
         }
       }
 
@@ -250,7 +301,7 @@ app.put(
       res.status(200).json({ message: 'User updated successfully.' });
     } catch (error: any) {
       console.error('Error updating user:', error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: 'Internal server error.' });
     }
   }
 );
@@ -294,8 +345,11 @@ app.post('/api/users/:uid/promote', authMiddleware, isSuperAdmin, async (req: an
   }
 });
 
-app.listen(port, () => {
-  console.log(`Backend server is running on http://localhost:${port}`);
-});
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Backend server is running on http://localhost:${port}`);
+  });
+}
 
 export default app;

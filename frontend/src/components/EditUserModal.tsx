@@ -14,7 +14,7 @@ interface EditUserModalProps {
   user: User | null;
   onClose: () => void;
   onUserUpdated: () => void;
-  authToken: string;
+  authToken: (() => Promise<string>) | string;
 }
 
 const EditUserModal: React.FC<EditUserModalProps> = ({
@@ -44,11 +44,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     setLoading(true);
 
     try {
+      const token = typeof authToken === 'function' ? await authToken() : authToken;
       const response = await fetch(`http://localhost:4000/api/users/${user.uid}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           fullName,
@@ -63,8 +64,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
 
       onUserUpdated();
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(errorMessage);
       console.error('Error updating user:', err);
     } finally {
       setLoading(false);
